@@ -1,0 +1,181 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Interface visual do Concorde, projeto de Redes de Computadores.">
+    <title>Concorde | Conversas</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Protótipo visual: os dados abaixo são exemplos estáticos. -->
+    <div class="aplicativo">
+        <!-- Coluna de navegação -->
+        <nav class="barra-servidores" aria-label="Navegação principal">
+            <div class="logo" title="Concorde">C</div>
+            <div class="separador"></div>
+            <a class="servidor ativo" href="#inicio" aria-label="Página inicial">⌂</a>
+            <a class="servidor" href="#grupos" aria-label="Grupos">#</a>
+            <a class="servidor" href="#contatos" aria-label="Contatos">✉</a>
+        </nav>
+
+        <!-- Lista de conversas e grupos -->
+        <aside class="barra-lateral" id="inicio">
+            <header class="cabecalho-lateral">
+                <div>
+                    <p class="texto-pequeno">SISTEMA DE MENSAGENS</p>
+                    <h1>Concorde<span class="ponto">.</span></h1>
+                </div>
+            </header>
+
+            <div class="area-busca">
+                <input type="search" aria-label="Buscar conversas" placeholder="Buscar conversa...">
+            </div>
+
+            <div class="conteudo-lateral">
+                <section class="secao-lateral" id="grupos">
+                    <div class="titulo-secao">
+                        <h2>Grupos</h2>
+                        <button type="button" class="botao-pequeno" aria-label="Criar grupo" title="Criar grupo (visual)">+</button>
+                    </div>
+                    <div class="item-conversa selecionado">
+                        <span class="icone-canal">#</span>
+                        <div class="dados-conversa">
+                            <strong>geral</strong>
+                            <small>Conversa da turma</small>
+                        </div>
+                    </div>
+                    <div class="item-conversa">
+                        <span class="icone-canal">#</span>
+                        <div class="dados-conversa">
+                            <strong>projeto-redes</strong>
+                            <small>Equipe Concorde</small>
+                        </div>
+                    </div>
+                    <div class="item-conversa">
+                        <span class="icone-canal">#</span>
+                        <div class="dados-conversa">
+                            <strong>avisos</strong>
+                            <small>Informações importantes</small>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="secao-lateral" id="contatos">
+                    <div class="titulo-secao">
+                        <h2>Mensagens privadas</h2>
+                        <span class="quantidade">3</span>
+                    </div>
+                    <div class="item-conversa">
+                        <span class="avatar avatar-roxo">A<span class="status"></span></span>
+                        <div class="dados-conversa">
+                            <strong>Ana</strong>
+                            <small>Você viu o código?</small>
+                        </div>
+                    </div>
+                    <div class="item-conversa">
+                        <span class="avatar avatar-azul">B<span class="status"></span></span>
+                        <div class="dados-conversa">
+                            <strong>Bruno</strong>
+                            <small>Reunião às 19h</small>
+                        </div>
+                    </div>
+                    <div class="item-conversa">
+                        <span class="avatar avatar-laranja">C<span class="status ausente"></span></span>
+                        <div class="dados-conversa">
+                            <strong>Carla</strong>
+                            <small>Até amanhã!</small>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <footer class="perfil">
+                <span class="avatar avatar-usuario">V<span class="status"></span></span>
+                <div class="dados-conversa">
+                    <strong>Você</strong>
+                    <small>Disponível</small>
+                </div>
+                <span class="icone-configuracao" aria-hidden="true">⚙</span>
+            </footer>
+        </aside>
+
+        <!-- Área central do chat -->
+        <main class="principal">
+            <header class="cabecalho-chat">
+                <div class="identificacao-canal">
+                    <span class="simbolo-canal">#</span>
+                    <div>
+                        <h2>geral</h2>
+                        <p>Converse com todos do grupo</p>
+                    </div>
+                </div>
+                <span class="etiqueta"><span class="bolinha-online"></span> Prévia visual</span>
+            </header>
+
+            <section class="mensagens" aria-label="Histórico de mensagens de exemplo">
+                <div class="apresentacao-grupo">
+                    <div class="icone-grupo">#</div>
+                    <h2>Bem-vindo ao #geral</h2>
+                    <p>Este é o começo da conversa do grupo no Concorde.</p>
+                </div>
+
+                <div class="divisor-data"><span>Hoje</span></div>
+
+                <article class="mensagem">
+                    <span class="avatar avatar-roxo">A</span>
+                    <div class="corpo-mensagem">
+                        <div class="meta-mensagem"><strong>Ana</strong><time>18:42</time></div>
+                        <p>Boa noite, pessoal! Como está o andamento do trabalho de Redes?</p>
+                    </div>
+                </article>
+
+                <article class="mensagem">
+                    <span class="avatar avatar-azul">B</span>
+                    <div class="corpo-mensagem">
+                        <div class="meta-mensagem"><strong>Bruno</strong><time>18:44</time></div>
+                        <p>O servidor TCP já está recebendo as mensagens. Falta finalizar a interface.</p>
+                    </div>
+                </article>
+
+                <article class="mensagem">
+                    <span class="avatar avatar-usuario">V</span>
+                    <div class="corpo-mensagem">
+                        <div class="meta-mensagem"><strong>Você</strong><time>18:46</time></div>
+                        <p>Estou preparando o HTML e o CSS do Concorde!</p>
+                    </div>
+                </article>
+
+                <article class="mensagem">
+                    <span class="avatar avatar-roxo">A</span>
+                    <div class="corpo-mensagem">
+                        <div class="meta-mensagem"><strong>Ana</strong><time>18:47</time></div>
+                        <p>Ótimo! Depois podemos integrar tudo com o cliente Python.</p>
+                    </div>
+                </article>
+            </section>
+
+            <!-- O campo abaixo ainda não envia mensagens: somente HTML e CSS. -->
+            <div class="rodape-chat">
+                <div class="campo-mensagem">
+                    <input type="text" aria-label="Escrever mensagem" placeholder="Mensagem para #geral">
+                    <button type="button" class="botao-enviar" title="Envio depende da integração com Python">Enviar <span aria-hidden="true">➤</span></button>
+                </div>
+                <p>Interface demonstrativa: o envio de mensagens ainda não está conectado ao servidor.</p>
+            </div>
+        </main>
+
+        <!-- Lista de membros do grupo -->
+        <aside class="painel-membros" aria-label="Membros de exemplo">
+            <h2>Membros — 4</h2>
+            <p class="subtitulo-membros">ONLINE — 3</p>
+            <div class="membro"><span class="avatar avatar-usuario">V<span class="status"></span></span><span>Você</span></div>
+            <div class="membro"><span class="avatar avatar-roxo">A<span class="status"></span></span><span>Ana</span></div>
+            <div class="membro"><span class="avatar avatar-azul">B<span class="status"></span></span><span>Bruno</span></div>
+            <p class="subtitulo-membros">OFFLINE — 1</p>
+            <div class="membro offline"><span class="avatar avatar-laranja">C<span class="status ausente"></span></span><span>Carla</span></div>
+        </aside>
+    </div>
+</body>
+</html>
