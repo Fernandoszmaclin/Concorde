@@ -1,0 +1,2 @@
+# Apenas acesso aos dispositivos. Toda comunicação de voz usa nossos sockets.
+sounddevice==0.5.6

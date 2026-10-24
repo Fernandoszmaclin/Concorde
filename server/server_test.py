@@ -1,12 +1,13 @@
 ## arquivo temporario so pra teste, 
 ## enquanto os guris estao preparando o resto
 
-
-
+import argparse
 import socket
 import threading
 
 from shared.protocol import send_message, receive_message
+from shared.voice_protocol import DEFAULT_VOICE_PORT, FRAME_MS, SAMPLE_RATE
+from server.voice_server import VoiceRelay
 
 HOST = "127.0.0.1"
 PORT = 5000
@@ -16,6 +17,27 @@ clients_lock = threading.Lock()
 
 groups = {}
 groups_lock = threading.Lock()
+
+# Instanciado no main: importar este arquivo em testes não abre portas.
+voice_relay = None
+
+
+def update_voice_participants(group):
+    snapshot = voice_relay.snapshot(group)
+    participants = snapshot["participants"]
+    event = {"type": "VOICE_PARTICIPANTS", "group": group,
+             **snapshot}
+    for participant in participants:
+        send_to_user(participant["username"], event)
+
+
+def leave_voice(username, group=None, notify=True):
+    left_group = voice_relay.leave(username, group)
+    if left_group is not None:
+        if notify:
+            send_to_user(username, {"type": "VOICE_LEFT", "group": left_group})
+        update_voice_participants(left_group)
+    return left_group
 
 
 def send_to_user(username, data):
@@ -134,34 +156,29 @@ def handle_client(conn, address):
             })
             return
 
-        username = data.get("username")
+        candidate = data.get("username")
 
-        if not isinstance(username, str) or not username.strip():
+        if not isinstance(candidate, str) or not candidate.strip():
             send_message(conn, {
                 "type": "ERROR",
                 "message": "Nome inválido"
             })
             return
 
-        username = username.strip()
+        username = candidate.strip()
 
-        with clients_lock:
-            if username in clients:
-                send_message(conn, {
-                    "type": "ERROR",
-                    "message": "Usuário já conectado"
-                })
+        # Publicamos o cliente com seu lock já adquirido. Assim nenhum broadcast
+        # consegue chegar antes de LOGIN_OK ou misturar bytes de duas mensagens.
+        send_lock = threading.Lock()
+        with send_lock:
+            with clients_lock:
+                duplicate = username in clients
+                if not duplicate:
+                    clients[username] = {"conn": conn, "lock": send_lock}
+            if duplicate:
+                send_message(conn, {"type": "ERROR", "message": "Usuário já conectado"})
                 return
-
-        clients[username] = {
-                "conn": conn,
-                "lock": threading.Lock()
-        }
-
-        send_message(conn, {
-            "type": "LOGIN_OK",
-            "username": username
-        })
+            send_message(conn, {"type": "LOGIN_OK", "username": username})
 
         print(f"{username} conectado: {address}")
 
@@ -184,7 +201,7 @@ def handle_client(conn, address):
                 message = data.get("message")
 
                 if not isinstance(destination, str) or not isinstance(message, str):
-                    send_message(conn, {
+                    send_to_user(username, {
                         "type": "ERROR",
                         "message": "Mensagem inválida"
                     })
@@ -202,12 +219,12 @@ def handle_client(conn, address):
                                 "message": message
                             })
                     except OSError:
-                        send_message(conn, {
+                        send_to_user(username, {
                             "type": "ERROR",
                             "message": "Falha ao entregar mensagem"
                         })
                 else:
-                    send_message(conn, {
+                    send_to_user(username, {
                         "type": "ERROR",
                         "message": "Usuário não encontrado"
                     })
@@ -265,6 +282,8 @@ def handle_client(conn, address):
                     continue
 
                 if leave_group(username, group):
+                    # Sair do grupo também revoga imediatamente sua sessão de voz.
+                    leave_voice(username, group)
                     send_to_user(username, {
                         "type": "GROUP_EVENT",
                         "message": f"Você saiu de {group}"
@@ -274,6 +293,29 @@ def handle_client(conn, address):
                         "type": "ERROR",
                         "message": "Não foi possível sair do grupo"
                     })
+
+            elif data.get("type") == "VOICE_JOIN":
+                group = data.get("group")
+                try:
+                    if not isinstance(group, str) or not group.strip():
+                        raise ValueError("Grupo inválido")
+                    with groups_lock:
+                        if username not in groups.get(group, set()):
+                            raise ValueError("Entre no grupo de texto antes de entrar na voz")
+                        session = voice_relay.join(username, group, address[0])
+                    send_to_user(username, {
+                        "type": "VOICE_JOINED", "group": group,
+                        "port": voice_relay.port, "token": session.token.hex(),
+                        "speaker": session.speaker, "sample_rate": SAMPLE_RATE,
+                        "frame_ms": FRAME_MS,
+                    })
+                    update_voice_participants(group)
+                except ValueError as error:
+                    send_to_user(username, {"type": "VOICE_ERROR", "message": str(error)})
+
+            elif data.get("type") == "VOICE_LEAVE":
+                if leave_voice(username) is None:
+                    send_to_user(username, {"type": "VOICE_LEFT", "group": None})
 
             elif data.get("type") == "GROUP_LIST":
                 send_to_user(username, {
@@ -336,10 +378,20 @@ def handle_client(conn, address):
     
     finally:
         removed = False
+        left_voice_group = None
 
         if username:
             with clients_lock:
                 if clients.get(username, {}).get("conn") is conn:
+                    # Limpamos a sessão antiga antes de liberar o nome para reconexão.
+                    # Uma tentativa de login duplicada nunca remove o cliente original.
+                    if voice_relay is not None:
+                        left_voice_group = voice_relay.leave(username)
+                    with groups_lock:
+                        for group in list(groups):
+                            groups[group].discard(username)
+                            if not groups[group]:
+                                del groups[group]
                     del clients[username]
                     removed = True
 
@@ -348,12 +400,8 @@ def handle_client(conn, address):
         if removed:
             print(f"{username} desconectado.")
 
-            with groups_lock:
-                for group in list(groups.keys()):
-                    groups[group].discard(username)
-
-                    if not groups[group]:
-                        del groups[group]
+            if left_voice_group is not None:
+                update_voice_participants(left_voice_group)
 
             update_user_list()
 
@@ -363,25 +411,35 @@ def handle_client(conn, address):
                 "status": "offline"
             })
 
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-    server.setsockopt(
-        socket.SOL_SOCKET,
-        socket.SO_REUSEADDR,
-        1
-    )
+def main():
+    global voice_relay
+    parser = argparse.ArgumentParser(description="Chat TCP e voz em grupo UDP")
+    parser.add_argument("--host", default=HOST,
+                        help="Use 0.0.0.0 para aceitar clientes da rede local")
+    parser.add_argument("--port", type=int, default=PORT)
+    parser.add_argument("--voice-port", type=int, default=DEFAULT_VOICE_PORT)
+    args = parser.parse_args()
 
-    server.bind((HOST, PORT))
-    server.listen()
+    voice_relay = VoiceRelay(args.host, args.voice_port)
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind((args.host, args.port))
+            server.listen()
+            voice_relay.start()
+            print(f"Chat TCP: {args.host}:{server.getsockname()[1]}", flush=True)
+            print(f"Voz UDP: {args.host}:{voice_relay.port}", flush=True)
+            while True:
+                conn, address = server.accept()
+                threading.Thread(target=handle_client, args=(conn, address),
+                                 daemon=True).start()
+    except KeyboardInterrupt:
+        print("\nServidor encerrado.")
+    except OSError as error:
+        parser.exit(1, f"Não foi possível iniciar o servidor: {error}\n")
+    finally:
+        voice_relay.close()
 
-    print("Servidor aguardando conexões...")
 
-    while True:
-        conn, address = server.accept()
-
-        thread = threading.Thread(
-            target=handle_client,
-            args=(conn, address),
-            daemon=True
-        )
-
-        thread.start()
+if __name__ == "__main__":
+    main()

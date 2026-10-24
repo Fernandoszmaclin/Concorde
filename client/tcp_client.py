@@ -3,14 +3,30 @@ import socket
 import threading
 
 from shared.protocol import send_message, receive_message
+from client.voice_client import VoiceClient, list_audio_devices
 
 
 class TCPClient:
-    def __init__(self, host="127.0.0.1", port=5000):
+    def __init__(self, host="127.0.0.1", port=5000,
+                 input_device=None, output_device=None):
         self.host = host
         self.port = port
         self.socket = None
         self.running = False
+        # Comandos do terminal e eventos da voz podem enviar TCP simultaneamente.
+        self.send_lock = threading.Lock()
+        self.voice_lock = threading.RLock()
+        self.voice = None
+        self.voice_pending = None
+        self.voice_leaving = False
+        self.input_device = input_device
+        self.output_device = output_device
+
+    def _send(self, data):
+        with self.send_lock:
+            if self.socket is None:
+                raise ConnectionError("Cliente desconectado")
+            send_message(self.socket, data)
 
     def connect(self):
         self.socket = socket.socket(
@@ -26,7 +42,7 @@ class TCPClient:
             raise
 
     def login(self, username):
-        send_message(self.socket, {
+        self._send({
             "type": "LOGIN",
             "username": username
         })
@@ -44,7 +60,7 @@ class TCPClient:
         return response
 
     def send_private_message(self, destination, message):
-        send_message(self.socket, {
+        self._send({
             "type": "PRIVATE_MESSAGE",
             "to": destination,
             "message": message
@@ -54,6 +70,14 @@ class TCPClient:
         while self.running:
             try:
                 data = receive_message(self.socket)
+
+                if not isinstance(data, dict):
+                    continue
+
+                kind = data.get("type")
+                if isinstance(kind, str) and kind.startswith("VOICE_"):
+                    self._handle_voice_event(data)
+                    continue
 
                 if data.get("type") == "MESSAGE_RECEIVED":
                     print(
@@ -111,10 +135,13 @@ class TCPClient:
                 if self.running:
                     print("\nConexão com servidor perdida.")
                 self.running = False
+                self._stop_voice()
                 break
 
     def disconnect(self):
         self.running = False
+        # Fechar a conexão TCP faz o servidor também revogar o token de voz.
+        self._stop_voice()
 
         if self.socket:
             try:
@@ -126,38 +153,114 @@ class TCPClient:
             self.socket = None
 
     def create_group(self, group):
-        send_message(self.socket, {
+        self._send({
             "type": "GROUP_CREATE",
             "group": group
         })
 
     def join_group(self, group):
-        send_message(self.socket, {
+        self._send({
             "type": "GROUP_JOIN",
             "group": group
         })
 
     def leave_group(self, group):
-        send_message(self.socket, {
+        self._send({
             "type": "GROUP_LEAVE",
             "group": group
         })
 
     def list_groups(self):
-        send_message(self.socket, {
+        self._send({
             "type": "GROUP_LIST"
         })
 
     def list_members(self, group):
-        send_message(self.socket, {
+        self._send({
             "type": "GROUP_MEMBERS",
             "group": group
         })
 
     def send_group_message(self, group, message):
-        send_message(self.socket, {
+        self._send({
             "type": "GROUP_MESSAGE",
             "group": group,
             "message": message
         })
+
+    def join_voice(self, group):
+        with self.voice_lock:
+            if self.voice is not None or self.voice_pending or self.voice_leaving:
+                print("\n[Voz] Já existe chamada ativa ou operação em andamento. Use /sairvoz.")
+                return
+            self.voice_pending = group
+            try:
+                self._send({"type": "VOICE_JOIN", "group": group})
+            except (OSError, ConnectionError):
+                self.voice_pending = None
+                raise
+
+    def leave_voice(self):
+        with self.voice_lock:
+            self.voice_leaving = True
+            self._stop_voice()
+            self._send({"type": "VOICE_LEAVE"})
+
+    def toggle_mute(self):
+        with self.voice_lock:
+            if self.voice is None:
+                print("\n[Voz] Entre em uma chamada com /voz NOME.")
+                return
+            muted = not self.voice.muted.is_set()
+            self.voice.set_muted(muted)
+            print("\n[Voz] Microfone " + ("silenciado." if muted else "ativado."))
+
+    def show_audio_devices(self):
+        try:
+            print(list_audio_devices())
+        except RuntimeError as error:
+            print(f"\n[Voz] {error}")
+
+    def _stop_voice(self):
+        with self.voice_lock:
+            if self.voice is not None:
+                self.voice.stop()
+                self.voice = None
+            self.voice_pending = None
+
+    def _handle_voice_event(self, data):
+        with self.voice_lock:
+            kind = data.get("type")
+            if kind == "VOICE_JOINED":
+                if self.voice_leaving or self.voice_pending != data["group"]:
+                    return
+                try:
+                    # Usamos o IP efetivo do servidor TCP, inclusive na rede local.
+                    voice = VoiceClient(
+                        self.socket.getpeername()[0], data["port"], data["token"],
+                        data["group"], self.input_device, self.output_device,
+                    )
+                    voice.start()
+                    self.voice = voice
+                    self.voice_pending = None
+                    print(f"\n[Voz] Chamada em {data['group']}. Use fones; /mute ou /sairvoz.")
+                except Exception as error:
+                    self.voice_pending = None
+                    self.voice_leaving = True
+                    self._send({"type": "VOICE_LEAVE"})
+                    print(f"\n[Voz] Não foi possível iniciar: {error}")
+            elif kind == "VOICE_PARTICIPANTS":
+                if self.voice is not None and self.voice.group == data["group"]:
+                    participants = data["participants"]
+                    if not self.voice.set_participants(participants, data["revision"]):
+                        return
+                    names = ", ".join(p["username"] for p in participants)
+                    print(f"\n[Voz] Participantes de {data['group']}: {names}")
+            elif kind == "VOICE_LEFT":
+                self._stop_voice()
+                self.voice_leaving = False
+                print("\n[Voz] Você saiu da chamada.")
+            elif kind == "VOICE_ERROR":
+                self.voice_pending = None
+                print("\n[Voz] Erro:", data.get("message"))
 
