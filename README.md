@@ -1,4 +1,6 @@
-# Discord2 — chat e voz em grupo
+# Concorde — chat e voz em grupo
+
+Mini Discord
 
 Protótipo acadêmico em Python com mensagens TCP e voz UDP via sockets.
 Requer Python 3.11 ou superior. Servidor e testes de rede usam a biblioteca
