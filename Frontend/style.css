@@ -307,3 +307,25 @@ input:focus { border-color: var(--destaque); outline: none; }
     .botao-enviar { padding: 10px; }
     .botao-enviar span { display: none; }
 }
+
+/* 8. Controles adicionados pelo JavaScript */
+.acoes-secao { display: flex; align-items: center; gap: 9px; }
+.item-conversa { width: 100%; border: 0; text-align: left; cursor: pointer; font: inherit; background: transparent; }
+.item-conversa:focus-visible, button:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+.lista-vazia { padding: 8px 14px; color: var(--secundario); font-size: 11px; }
+.botao-perfil { margin-left: auto; border: 1px solid var(--linha); color: var(--texto); background: #303954; padding: 8px; border-radius: 8px; font-size: 11px; }
+.botao-grupo { width: 100%; padding: 10px; border: 1px solid var(--linha); border-radius: 8px; color: var(--texto); background: #36405c; font-size: 12px; }
+.botao-grupo:hover, .botao-perfil:hover { background: #445375; }
+.botao-enviar:disabled { opacity: .45; cursor: not-allowed; }
+.concorde-aviso { position: fixed; z-index: 1000; right: 20px; bottom: 20px; max-width: 360px; padding: 13px 17px; border-radius: 9px; background: #354469; color: white; box-shadow: 0 8px 22px #0006; font-size: 13px; }
+.concorde-aviso.erro { background: #843d51; }
+.tela-login { position: fixed; z-index: 1001; inset: 0; display: grid; place-items: center; padding: 20px; background: #111320df; }
+.caixa-login { width: min(400px, 100%); padding: 30px; background: var(--lateral); border: 1px solid var(--linha); border-radius: 16px; box-shadow: 0 16px 50px #0009; }
+.caixa-login h2 { margin: 0 0 10px; font-size: 25px; }
+.caixa-login p { color: var(--secundario); font-size: 13px; line-height: 1.5; }
+.caixa-login form { display: grid; gap: 12px; margin-top: 20px; }
+.caixa-login input { width: 100%; padding: 13px; background: #121629; border: 1px solid var(--linha); border-radius: 8px; color: white; }
+.caixa-login button { width: 100%; padding: 12px; }
+.caixa-login .erro-login { color: #ff9aa9; margin: 0; }
+.botao-secundario { background: transparent; color: var(--secundario); border: 1px solid var(--linha); border-radius: 8px; }
+.botao-secundario:hover { background: #313a56; }
