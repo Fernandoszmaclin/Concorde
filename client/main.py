@@ -44,7 +44,7 @@ def main():
 
         print(f"\nBem-vindo, {username}!")
         print("Comandos disponíveis:")
-        print("/criar NOME")
+        print("/criar NOMEGRUPO")
         print("/entrar NOME")
         print("/sairgrupo NOME")
         print("/grupos")
